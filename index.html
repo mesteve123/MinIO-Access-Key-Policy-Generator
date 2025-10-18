@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MinIO Access Policy Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2a61c3;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea { 
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .checkbox-group {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .checkbox-group div {
+            margin-bottom: 5px;
+        }
+        button {
+            background-color: #2a61c3;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #1a4999;
+        }
+        #policyOutput {
+            margin-top: 30px;
+        }
+        #policyCode {
+            width: 100%;
+            height: 250px;
+            padding: 15px;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .info {
+            background-color: #e0f7fa;
+            border-left: 5px solid #00bcd4;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 MinIO Access Key Policy Generator</h1>
+
+        <div class="info">
+            <p>Enter the bucket names and select the desired permissions. The resulting Access Key Policy will appear below.</p>
+        </div>
+
+        <label for="bucketNames">Buckets Names (Comma-separated. Use <code>*</code> for all buckets):</label>
+        <input type="text" id="bucketNames" placeholder="e.g.: my-bucket-prod, my-bucket-dev, *" value="*">
+
+        <label>Access Permissions:</label>
+        <div class="checkbox-group">
+            <div><input type="checkbox" id="perm_read" value="s3:GetObject,s3:GetObjectRetention,s3:GetObjectTagging,s3:GetObjectVersion" checked> <label for="perm_read">Read Objects (Download, Stat)</label></div>
+            <div><input type="checkbox" id="perm_write" value="s3:PutObject,s3:AbortMultipartUpload,s3:DeleteObject,s3:PutObjectTagging" checked> <label for="perm_write">Write/Modify Objects (Upload, Delete)</label></div>
+            <div><input type="checkbox" id="perm_list_bucket_contents" value="s3:ListBucket" checked> <label for="perm_list_bucket_contents">List Bucket Content (List files)</label></div>
+            <div><input type="checkbox" id="perm_manage_bucket" value="s3:CreateBucket,s3:DeleteBucket,s3:GetBucketLocation,s3:ListBucketMultipartUploads" > <label for="perm_manage_bucket">Manage Buckets (Create/Delete Bucket)</label></div>
+        </div>
+        
+        <button onclick="generatePolicy()">Generate Access Key Policy</button>
+
+        <div id="policyOutput">
+            <h2>📜 Generated Access Key Policy:</h2>
+            <textarea id="policyCode" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        function generatePolicy() {
+            const bucketInput = document.getElementById('bucketNames').value.trim();
+            const rawBuckets = bucketInput.split(',').map(name => name.trim()).filter(name => name.length > 0);
+            
+            const selectedActions = [];
+            const checkboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]:checked');
+            checkboxes.forEach(checkbox => {
+                const actions = checkbox.value.split(',');
+                selectedActions.push(...actions);
+            });
+
+            const uniqueActions = [...new Set(selectedActions)].sort();
+
+            if (uniqueActions.length === 0) {
+                document.getElementById('policyCode').value = "Error: You must select at least one permission.";
+                return;
+            }
+
+            const resources = [];
+            
+            if (rawBuckets.includes('*')) {
+                resources.push("arn:aws:s3:::*"); 
+                resources.push("arn:aws:s3:::*/*"); 
+            } else {
+                rawBuckets.forEach(bucket => {
+                    resources.push(`arn:aws:s3:::${bucket}`);
+                    resources.push(`arn:aws:s3:::${bucket}/*`); 
+                });
+            }
+
+            const policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": uniqueActions,
+                        "Resource": [...new Set(resources)]
+                    }
+                ]
+            };
+
+            document.getElementById('policyCode').value = JSON.stringify(policy, null, 4);
+        }
+
+        document.addEventListener('DOMContentLoaded', generatePolicy);
+    </script>
+    <div style="margin-top: 40px; text-align: center; color: #6c757d; font-size: 0.875rem;">
+        <p style="margin-bottom: 10px;">This tool was created primarily with the help of AI. Its correct functioning is not guaranteed, and it is not recommended for use in professional environments.</p>
+        <p>Created by mesteve123 —
+            <a href="https://paypal.me/mteve?locale.x=es_ES" target="_blank" rel="noopener noreferrer" class="donate-btn">
+                Donate!
+            </a>
+        </p>
+    </div>
+</body>
+</html>
